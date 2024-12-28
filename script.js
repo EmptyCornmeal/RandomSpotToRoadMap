@@ -12,7 +12,7 @@ let roadLayer; // To display the nearest road
 let connectionLine; // To draw a line between the point and the road
 
 // Load GeoJSON
-fetch('world-administrative-boundaries.geojson') // Update with the correct path if needed
+fetch('https://raw.githubusercontent.com/EmptyCornmeal/RandomSpotToRoadMap/main/world-administrative-boundaries.geojson')
   .then((response) => response.json())
   .then((data) => {
     countries = data.features; // Save countries globally
@@ -60,8 +60,7 @@ function getRandomPointInCountry(country) {
       }
     } catch (error) {
       console.error('Error validating point:', error);
-      console.error('Country geometry:', country.geometry);
-      throw error; // Re-throw the error for further debugging
+      throw error;
     }
   }
 }
@@ -74,112 +73,69 @@ async function findClosestRoad() {
   }
 
   const [lat, lng] = randomPoint;
-  let bufferSize = 1; // Start with a 1 km buffer
-  const maxBufferSize = 100; // Safety limit to prevent indefinite loops
 
-  while (bufferSize <= maxBufferSize) {
-    // Draw a buffer circle around the random point
-    if (bufferCircle) {
-      map.removeLayer(bufferCircle);
-    }
-    bufferCircle = L.circle(randomPoint, {
-      radius: bufferSize * 1000, // Convert km to meters
-      color: 'red',
-      fillOpacity: 0.2,
-    }).addTo(map);
-
-    // Zoom to the buffer
-    map.fitBounds(bufferCircle.getBounds());
-
-    // Query Overpass API for roads within the current buffer
-    const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];way["highway"](around:${bufferSize * 1000},${lat},${lng});out geom;`;
-
-    try {
-      const response = await fetch(overpassUrl);
-      const data = await response.json();
-
-      if (data.elements.length > 0) {
-        // A road is found
-        const road = data.elements[0]; // Nearest road
-        const roadCoordinates = road.geometry.map((point) => [point.lat, point.lon]);
-
-        console.log(`Found road: ${road.tags.name || 'Unnamed road'}`);
-
-        // Clear the previous road layer
-        if (roadLayer) {
-          map.removeLayer(roadLayer);
-        }
-
-        // Add the road to the map
-        roadLayer = L.polyline(roadCoordinates, { color: 'blue', weight: 4 }).addTo(map);
-
-        // Find the closest point on the road to the random point
-        const nearestPoint = road.geometry.reduce((closest, point) => {
-          const distance = turf.distance(turf.point([lng, lat]), turf.point([point.lon, point.lat]));
-          return distance < closest.distance ? { point, distance } : closest;
-        }, { distance: Infinity }).point;
-
-        // Draw a line between the random point and the nearest point on the road
-        if (connectionLine) {
-          map.removeLayer(connectionLine);
-        }
-        connectionLine = L.polyline([[lat, lng], [nearestPoint.lat, nearestPoint.lon]], {
-          color: 'green',
-          weight: 2,
-        }).addTo(map);
-
-        // Display the distance on the line
-        const distance = turf.distance(turf.point([lng, lat]), turf.point([nearestPoint.lon, nearestPoint.lat]), { units: 'kilometers' });
-        const midpoint = [(lat + nearestPoint.lat) / 2, (lng + nearestPoint.lon) / 2];
-        L.marker(midpoint, {
-          icon: L.divIcon({
-            className: 'distance-label',
-            html: `<div style="background: white; padding: 2px; border-radius: 3px; font-size: 12px;">${distance.toFixed(2)} km</div>`,
-          }),
-        }).addTo(map);
-
-        alert(`Nearest road: ${road.tags.name || 'Unnamed road'}\nDistance: ${distance.toFixed(2)} km`);
-        return; // Stop expanding the buffer
-      }
-    } catch (error) {
-      console.error('Error querying Overpass API:', error);
-      alert('Failed to fetch road data. Try again later.');
-      return;
-    }
-
-    // Increment buffer size and retry
-    bufferSize += 1;
+  // Draw a buffer circle around the random point
+  if (bufferCircle) {
+    map.removeLayer(bufferCircle);
   }
+  bufferCircle = L.circle(randomPoint, {
+    radius: 5000, // 5 km buffer
+    color: 'red',
+    fillOpacity: 0.2,
+  }).addTo(map);
 
-  alert('No road found within 100 km.');
+  map.fitBounds(bufferCircle.getBounds()); // Zoom to the buffer
+
+  // Query Overpass API for roads within 5 km
+  const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];way["highway"](around:5000,${lat},${lng});out geom;`;
+
+  try {
+    const response = await fetch(overpassUrl);
+    const data = await response.json();
+
+    if (data.elements.length > 0) {
+      const road = data.elements[0];
+      const roadCoordinates = road.geometry.map((point) => [point.lat, point.lon]);
+
+      // Add the road to the map
+      if (roadLayer) map.removeLayer(roadLayer);
+      roadLayer = L.polyline(roadCoordinates, { color: 'blue', weight: 4 }).addTo(map);
+
+      const nearestPoint = road.geometry.reduce((closest, point) => {
+        const distance = turf.distance(turf.point([lng, lat]), turf.point([point.lon, point.lat]));
+        return distance < closest.distance ? { point, distance } : closest;
+      }, { distance: Infinity }).point;
+
+      // Draw a line between the random point and the nearest point on the road
+      if (connectionLine) map.removeLayer(connectionLine);
+      connectionLine = L.polyline([[lat, lng], [nearestPoint.lat, nearestPoint.lon]], {
+        color: 'green',
+        weight: 2,
+      }).addTo(map);
+
+      const distance = turf.distance(turf.point([lng, lat]), turf.point([nearestPoint.lon, nearestPoint.lat]), { units: 'kilometers' });
+      alert(`Found road ${road.tags.name || "Unnamed"} at ${distance.toFixed(2)}km`);
+    }
+  } catch (error) {
+    alert('No roads found nearby.');
+  }
 }
 
 // Main function to generate a random spot
 function generateRandomSpot() {
   const country = getRandomCountry(); // Pick a random country
-  randomPoint = getRandomPointInCountry(country); // Generate a random point
+  randomPoint = getRandomPointInCountry(country);
 
-  // Clear existing layers
   map.eachLayer((layer) => {
     if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline) {
       map.removeLayer(layer);
     }
   });
 
-  // Highlight the selected country
-  const countryLayer = L.geoJSON(country, { style: { color: 'blue', weight: 2 } });
-  countryLayer.addTo(map);
-
-  // Zoom to the country bounds
-  map.fitBounds(countryLayer.getBounds());
-
-  // Add a marker for the random point
-  L.marker(randomPoint)
-    .addTo(map)
-    .bindPopup(`Random Spot in ${country.properties.name}`)
-    .openPopup();
+  // Add marker and zoom to country
+  L.marker(randomPoint).addTo(map).bindPopup(`Random Spot`).openPopup();
 }
 
-// Attach event listeners to the buttons
+// Event Listeners
 document.getElementById('generate').addEventListener('click', generateRandomSpot);
 document.getElementById('find-road').addEventListener('click', findClosestRoad);

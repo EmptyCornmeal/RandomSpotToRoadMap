@@ -3,20 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Find Closest Road</title>
+  <title>Random Spot to Road Finder</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/dist/turf.min.js"></script>
-  <style>
-    #map { height: 90vh; }
-    button { margin: 10px; padding: 10px 20px; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <button id="generate">Generate Random Spot</button>
-  <button id="find-road">Find Closest Road</button>
-  <div id="map"></div>
+  <header>
+    <h1>Random Spot to Road Finder</h1>
+    <p>Click to generate a random location and find the nearest road.</p>
+  </header>
+  <main>
+    <div class="controls">
+      <button id="generate">Generate Random Spot</button>
+      <button id="find-road">Find Closest Road</button>
+    </div>
+    <div id="map"></div>
+  </main>
+  <footer>
+    <p>Made with ❤️ by <a href="https://github.com/EmptyCornmeal" target="_blank">EmptyCornmeal</a></p>
+  </footer>
   <script src="script.js"></script>
 </body>
 </html>
