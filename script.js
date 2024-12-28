@@ -124,17 +124,30 @@ async function findClosestRoad() {
 // Main function to generate a random spot
 function generateRandomSpot() {
   const country = getRandomCountry(); // Pick a random country
-  randomPoint = getRandomPointInCountry(country);
+  randomPoint = getRandomPointInCountry(country); // Generate a random point
 
+  // Clear existing non-GeoJSON layers (like markers, circles, and polylines)
   map.eachLayer((layer) => {
-    if (layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polyline) {
+    if (!(layer instanceof L.TileLayer) && !(layer instanceof L.GeoJSON)) {
       map.removeLayer(layer);
     }
   });
 
-  // Add marker and zoom to country
-  L.marker(randomPoint).addTo(map).bindPopup(`Random Spot`).openPopup();
+  // Highlight the selected country
+  const countryLayer = L.geoJSON(country, { style: { color: 'blue', weight: 2 } });
+  countryLayer.addTo(map);
+
+  // Zoom to the country bounds
+  map.fitBounds(countryLayer.getBounds());
+
+  // Add a marker for the random point with coordinates in the popup
+  const [lat, lng] = randomPoint;
+  L.marker(randomPoint)
+    .addTo(map)
+    .bindPopup(`Random Spot in ${country.properties.name} at (${lat.toFixed(5)}, ${lng.toFixed(5)})`)
+    .openPopup();
 }
+
 
 // Event Listeners
 document.getElementById('generate').addEventListener('click', generateRandomSpot);
