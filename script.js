@@ -16,11 +16,11 @@ fetch('world-administrative-boundaries.geojson')
     return response.json();
   })
   .then(data => {
+    console.log('GeoJSON Data:', data); // Debug GeoJSON data
     countries = data.features;
     populateCountryDropdowns(); // Populate dropdowns after data is loaded
   })
   .catch(err => console.error('Error loading GeoJSON:', err));
-
 
 // Group countries and territories
 function groupCountriesAndTerritories() {
@@ -53,6 +53,7 @@ function groupCountriesAndTerritories() {
     }
   });
 
+  console.log('Grouped Data:', groupedData); // Debug grouped data
   return groupedData;
 }
 
@@ -65,18 +66,16 @@ function populateCountryDropdowns() {
 
   // Populate parent country dropdown
   Object.values(groupedData)
-    .filter(group => group.territories.length === 0 || group.parentName) // Only independent countries
+    .filter(group => group.parentName) // Only include groups with a parentName
     .sort((a, b) => a.parentName.localeCompare(b.parentName))
     .forEach(group => {
-      if (group.parentName) { // Add only parent countries
-        const option = document.createElement('option');
-        option.value = group.parentName;
-        option.textContent = group.parentName;
-        parentDropdown.appendChild(option);
-      }
+      const option = document.createElement('option');
+      option.value = group.parentName;
+      option.textContent = group.parentName;
+      parentDropdown.appendChild(option);
     });
 
-  // Add an independent territories section to the territory dropdown
+  // Add independent territories to the territory dropdown
   const independentTerritories = groupedData.independentTerritories.sort();
   if (independentTerritories.length > 0) {
     const independentGroup = document.createElement('optgroup');
@@ -163,4 +162,5 @@ function generateRandomSpot() {
   map.fitBounds(L.geoJSON(selectedFeature).getBounds());
 }
 
+// Attach the random spot generator to the button
 document.getElementById('generate').addEventListener('click', generateRandomSpot);
