@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Random Spot to Road Finder</title>
+  <title>Random Spot in Selected Country</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/dist/turf.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
-    <h1>Random Spot to Road Finder</h1>
-    <p>Click to generate a random location and find the nearest road.</p>
+    <h1>Random Spot in Selected Country</h1>
+    <p>Select a country and generate a random location within its boundaries.</p>
   </header>
   <main>
     <div class="controls">
+      <select id="countryDropdown">
+        <option value="">Select a Country</option>
+      </select>
       <button id="generate">Generate Random Spot</button>
-      <button id="find-road">Find Closest Road</button>
     </div>
     <div id="map"></div>
   </main>

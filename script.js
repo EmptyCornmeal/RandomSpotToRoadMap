@@ -7,17 +7,26 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 let countries; // Store GeoJSON features
 let randomPoint; // Store the random point
-let bufferCircle; // To store the buffer circle
-let roadLayer; // To display the nearest road
-let connectionLine; // To draw a line between the point and the road
 
-// Load GeoJSON
+// Load GeoJSON and populate dropdown
 fetch('https://raw.githubusercontent.com/EmptyCornmeal/RandomSpotToRoadMap/main/world-administrative-boundaries.geojson')
-  .then((response) => response.json())
-  .then((data) => {
+  .then(response => response.json())
+  .then(data => {
     countries = data.features; // Save countries globally
     L.geoJSON(data).addTo(map); // Add all countries to the map
+    populateCountryDropdown(); // Populate dropdown with country names
   });
+
+// Populate the dropdown menu with country names
+function populateCountryDropdown() {
+  const dropdown = document.getElementById('countryDropdown');
+  countries.forEach(country => {
+    const option = document.createElement('option');
+    option.value = country.properties.name; // Adjust to match the property for the country name
+    option.textContent = country.properties.name;
+    dropdown.appendChild(option);
+  });
+}
 
 // Calculate bounding box for a feature
 function calculateBBox(feature) {
@@ -25,12 +34,6 @@ function calculateBBox(feature) {
   const lngs = coordinates.filter((_, i) => i % 2 === 0); // Extract longitudes
   const lats = coordinates.filter((_, i) => i % 2 !== 0); // Extract latitudes
   return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
-}
-
-// Pick a random country
-function getRandomCountry() {
-  const randomIndex = Math.floor(Math.random() * countries.length);
-  return countries[randomIndex];
 }
 
 // Generate a random point within a country's bounding box
@@ -50,7 +53,7 @@ function getRandomPointInCountry(country) {
         country.geometry.type === 'Polygon'
           ? turf.booleanPointInPolygon(point, country)
           : country.geometry.type === 'MultiPolygon'
-          ? country.geometry.coordinates.some((polygon) =>
+          ? country.geometry.coordinates.some(polygon =>
               turf.booleanPointInPolygon(point, { type: 'Polygon', coordinates: polygon })
             )
           : false;
@@ -65,76 +68,37 @@ function getRandomPointInCountry(country) {
   }
 }
 
-// Find the closest road and draw a line to it
-async function findClosestRoad() {
-  if (!randomPoint) {
-    alert('Generate a random point first!');
+// Main function to generate a random spot
+function generateRandomSpot() {
+  const dropdown = document.getElementById('countryDropdown');
+  const selectedCountryName = dropdown.value;
+
+  if (!selectedCountryName) {
+    alert('Please select a country!');
     return;
   }
 
-  const [lat, lng] = randomPoint;
+  // Find the selected country by name
+  const selectedCountry = countries.find(
+    country => country.properties.name === selectedCountryName
+  );
 
-  // Draw a buffer circle around the random point
-  if (bufferCircle) {
-    map.removeLayer(bufferCircle);
+  if (!selectedCountry) {
+    alert('Country not found in GeoJSON data.');
+    return;
   }
-  bufferCircle = L.circle(randomPoint, {
-    radius: 5000, // 5 km buffer
-    color: 'red',
-    fillOpacity: 0.2,
-  }).addTo(map);
 
-  map.fitBounds(bufferCircle.getBounds()); // Zoom to the buffer
-
-  // Query Overpass API for roads within 5 km
-  const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];way["highway"](around:5000,${lat},${lng});out geom;`;
-
-  try {
-    const response = await fetch(overpassUrl);
-    const data = await response.json();
-
-    if (data.elements.length > 0) {
-      const road = data.elements[0];
-      const roadCoordinates = road.geometry.map((point) => [point.lat, point.lon]);
-
-      // Add the road to the map
-      if (roadLayer) map.removeLayer(roadLayer);
-      roadLayer = L.polyline(roadCoordinates, { color: 'blue', weight: 4 }).addTo(map);
-
-      const nearestPoint = road.geometry.reduce((closest, point) => {
-        const distance = turf.distance(turf.point([lng, lat]), turf.point([point.lon, point.lat]));
-        return distance < closest.distance ? { point, distance } : closest;
-      }, { distance: Infinity }).point;
-
-      // Draw a line between the random point and the nearest point on the road
-      if (connectionLine) map.removeLayer(connectionLine);
-      connectionLine = L.polyline([[lat, lng], [nearestPoint.lat, nearestPoint.lon]], {
-        color: 'green',
-        weight: 2,
-      }).addTo(map);
-
-      const distance = turf.distance(turf.point([lng, lat]), turf.point([nearestPoint.lon, nearestPoint.lat]), { units: 'kilometers' });
-      alert(`Found road ${road.tags.name || "Unnamed"} at ${distance.toFixed(2)}km`);
-    }
-  } catch (error) {
-    alert('No roads found nearby.');
-  }
-}
-
-// Main function to generate a random spot
-function generateRandomSpot() {
-  const country = getRandomCountry(); // Pick a random country
-  randomPoint = getRandomPointInCountry(country); // Generate a random point
+  randomPoint = getRandomPointInCountry(selectedCountry); // Generate a random point
 
   // Clear existing non-GeoJSON layers (like markers, circles, and polylines)
-  map.eachLayer((layer) => {
+  map.eachLayer(layer => {
     if (!(layer instanceof L.TileLayer) && !(layer instanceof L.GeoJSON)) {
       map.removeLayer(layer);
     }
   });
 
   // Highlight the selected country
-  const countryLayer = L.geoJSON(country, { style: { color: 'blue', weight: 2 } });
+  const countryLayer = L.geoJSON(selectedCountry, { style: { color: 'blue', weight: 2 } });
   countryLayer.addTo(map);
 
   // Zoom to the country bounds
@@ -144,11 +108,9 @@ function generateRandomSpot() {
   const [lat, lng] = randomPoint;
   L.marker(randomPoint)
     .addTo(map)
-    .bindPopup(`Random Spot in ${country.properties.name} at (${lat.toFixed(5)}, ${lng.toFixed(5)})`)
+    .bindPopup(`Random Spot in ${selectedCountryName} at (${lat.toFixed(5)}, ${lng.toFixed(5)})`)
     .openPopup();
 }
 
-
-// Event Listeners
+// Event Listener
 document.getElementById('generate').addEventListener('click', generateRandomSpot);
-document.getElementById('find-road').addEventListener('click', findClosestRoad);
