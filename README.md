@@ -1,16 +1,23 @@
-# Random Spot to Nearest Road Map
+# Random Spot in Selected Country
 
-This application generates a random spot within a randomly selected country and finds the closest road to that spot.
-
-## Live Demo
-[Try it here!](https://EmptyCornmeal.github.io/RandomSpotToRoadMap/)
+This branch introduces functionality for selecting a country from a dropdown menu and generating a random spot within that country's boundaries. The selected point is displayed on a map, along with the country's highlighted boundary.
 
 ## Features
-- Generate a random location within a country.
-- Dynamically find and display the nearest road using the Overpass API.
-- Visualise the buffer area, road, and distance line on the map.
+- Dropdown menu to select a country from GeoJSON data.
+- Random spot generation within the selected country's polygon or multipolygon.
+- Integration with Leaflet.js for map visualization.
+- Uses Turf.js for spatial operations like point validation.
 
 ## How to Use
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/EmptyCornmeal/RandomSpotToRoadMap.git
+1. Open the project in a browser.
+2. Select a country from the dropdown menu.
+3. Click "Generate Random Spot" to display a random location within the selected country's boundary.
+
+## Dependencies
+- [Leaflet.js](https://leafletjs.com/) for map rendering.
+- [Turf.js](https://turfjs.org/) for geospatial calculations.
+- GeoJSON data for administrative boundaries.
+
+## Future Enhancements
+- Add more UI elements for better interactivity.
+- Option to export the generated point's coordinates.
