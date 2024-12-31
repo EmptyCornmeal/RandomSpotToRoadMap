@@ -9,7 +9,12 @@ let countries; // Store GeoJSON features globally
 
 // Fetch and load GeoJSON
 fetch('world-administrative-boundaries.geojson')
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  })
   .then(data => {
     countries = data.features;
     populateCountryDropdowns(); // Populate dropdowns after data is loaded
