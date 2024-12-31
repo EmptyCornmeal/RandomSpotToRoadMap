@@ -12,37 +12,45 @@ fetch('data/world-administrative-boundaries.geojson')
   .then(response => response.json())
   .then(data => {
     countries = data.features;
-    populateCountryDropdowns(); // Populate the dropdowns after data is loaded
+    populateCountryDropdowns(); // Populate dropdowns after data is loaded
   })
   .catch(err => console.error('Error loading GeoJSON:', err));
 
 // Group countries and territories
 function groupCountriesAndTerritories() {
-  const groupedData = {};
+  const groupedData = { independentTerritories: [] };
 
   countries.forEach(country => {
-    const parentCode = country.properties.color_code || country.properties.iso3; // Parent country code
-    const name = country.properties.name; // Country or territory name
-    const status = country.properties.status || ''; // Status (e.g., "Member State", "Territory")
+    const colorCode = country.properties.color_code || country.properties.iso3;
+    const name = country.properties.name;
+    const status = country.properties.status || '';
 
-    if (!groupedData[parentCode]) {
-      groupedData[parentCode] = {
-        parentName: status === 'Member State' ? name : parentCode, // Use name if it's a member state
+    if (!colorCode) {
+      // Handle independent territories or unlinked features
+      if (status.includes('Non-Self-Governing Territory') || status.includes('Occupied')) {
+        groupedData.independentTerritories.push(name);
+      }
+      return;
+    }
+
+    if (!groupedData[colorCode]) {
+      groupedData[colorCode] = {
+        parentName: status === 'Member State' ? name : colorCode,
         territories: []
       };
     }
 
-    if (status.includes('Territory')) {
-      groupedData[parentCode].territories.push(name); // Add as a territory
+    if (status.includes('Territory') || status.includes('Special Administrative Region')) {
+      groupedData[colorCode].territories.push(name);
     } else {
-      groupedData[parentCode].parentName = name; // Update parent country name
+      groupedData[colorCode].parentName = name;
     }
   });
 
   return groupedData;
 }
 
-// Populate dropdowns
+// Populate country and territory dropdowns
 function populateCountryDropdowns() {
   const groupedData = groupCountriesAndTerritories();
 
@@ -51,13 +59,32 @@ function populateCountryDropdowns() {
 
   // Populate parent country dropdown
   Object.values(groupedData)
+    .filter(group => group.territories.length === 0 || group.parentName) // Only independent countries
     .sort((a, b) => a.parentName.localeCompare(b.parentName))
     .forEach(group => {
-      const option = document.createElement('option');
-      option.value = group.parentName;
-      option.textContent = group.parentName;
-      parentDropdown.appendChild(option);
+      if (group.parentName) { // Add only parent countries
+        const option = document.createElement('option');
+        option.value = group.parentName;
+        option.textContent = group.parentName;
+        parentDropdown.appendChild(option);
+      }
     });
+
+  // Add an independent territories section to the territory dropdown
+  const independentTerritories = groupedData.independentTerritories.sort();
+  if (independentTerritories.length > 0) {
+    const independentGroup = document.createElement('optgroup');
+    independentGroup.label = "Independent Territories";
+
+    independentTerritories.forEach(territory => {
+      const option = document.createElement('option');
+      option.value = territory;
+      option.textContent = territory;
+      independentGroup.appendChild(option);
+    });
+
+    territoryDropdown.appendChild(independentGroup);
+  }
 
   // Update territories when parent country is selected
   parentDropdown.addEventListener('change', () => {
@@ -81,6 +108,12 @@ function generateRandomSpot() {
   const territory = document.getElementById('territoryDropdown').value;
 
   const selectedRegion = territory || parentCountry; // Use territory if selected, fallback to parent country
+  if (selectedRegion === "world") {
+    alert('Generating a random spot for the entire world!');
+    // Generate a random spot for the world
+    return;
+  }
+
   const selectedFeature = countries.find(feature => feature.properties.name === selectedRegion);
 
   if (!selectedFeature) {
