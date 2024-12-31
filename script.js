@@ -22,7 +22,7 @@ fetch('world-administrative-boundaries.geojson')
   })
   .catch(err => console.error('Error loading GeoJSON:', err));
 
-// Group countries and territories
+// Group countries and territories with areas
 function groupCountriesAndTerritories() {
   const groupedData = { independentTerritories: [] };
 
@@ -30,11 +30,12 @@ function groupCountriesAndTerritories() {
     const colorCode = country.properties.color_code || country.properties.iso3;
     const name = country.properties.name;
     const status = country.properties.status || '';
+    const area = turf.area(country); // Calculate area using Turf.js
 
     if (!colorCode) {
       // Handle independent territories or unlinked features
       if (status.includes('Non-Self-Governing Territory') || status.includes('Occupied')) {
-        groupedData.independentTerritories.push(name);
+        groupedData.independentTerritories.push({ name, area });
       }
       return;
     }
@@ -42,15 +43,18 @@ function groupCountriesAndTerritories() {
     if (!groupedData[colorCode]) {
       groupedData[colorCode] = {
         parentName: status === 'Member State' ? name : colorCode,
-        territories: []
+        territories: [],
+        area: 0 // Track total area for proportional weighting
       };
     }
 
     if (status.includes('Territory') || status.includes('Special Administrative Region')) {
-      groupedData[colorCode].territories.push(name);
+      groupedData[colorCode].territories.push({ name, area });
     } else {
       groupedData[colorCode].parentName = name;
     }
+
+    groupedData[colorCode].area += area; // Add area to total
   });
 
   console.log('Grouped Data:', groupedData); // Debug grouped data
@@ -62,7 +66,7 @@ function populateCountryDropdowns() {
   const groupedData = groupCountriesAndTerritories();
 
   const parentDropdown = document.getElementById('countryDropdown');
-  const territoryDropdown = document.getElementById('territoryDropdown');
+  const territoryContainer = document.getElementById('territoryContainer'); // Checkbox container
 
   // Populate parent country dropdown
   Object.values(groupedData)
@@ -71,95 +75,109 @@ function populateCountryDropdowns() {
     .forEach(group => {
       const option = document.createElement('option');
       option.value = group.parentName;
-      option.textContent = group.parentName;
+      option.textContent = `${group.parentName} (${group.territories.length})`; // Show territory count
       parentDropdown.appendChild(option);
     });
 
-  // Add independent territories to the territory dropdown
-  const independentTerritories = groupedData.independentTerritories.sort();
+  // Add independent territories to the dropdown
+  const independentTerritories = groupedData.independentTerritories.sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
   if (independentTerritories.length > 0) {
     const independentGroup = document.createElement('optgroup');
-    independentGroup.label = "Independent Territories";
+    independentGroup.label = "Non-State Entities";
 
     independentTerritories.forEach(territory => {
       const option = document.createElement('option');
-      option.value = territory;
-      option.textContent = territory;
+      option.value = territory.name;
+      option.textContent = territory.name;
       independentGroup.appendChild(option);
     });
 
-    territoryDropdown.appendChild(independentGroup);
+    parentDropdown.appendChild(independentGroup);
   }
 
   // Update territories when parent country is selected
   parentDropdown.addEventListener('change', () => {
     const selectedParent = parentDropdown.value;
 
-    if (selectedParent === 'world') {
-      // Clear and disable territory dropdown for "All Countries"
-      territoryDropdown.innerHTML = '<option value="">Select a Territory</option>';
-      territoryDropdown.disabled = true;
-      return;
-    }
+    // Clear previous checkboxes
+    territoryContainer.innerHTML = '';
 
     const group = Object.values(groupedData).find(g => g.parentName === selectedParent);
 
-    // Clear and populate territory dropdown
-    territoryDropdown.innerHTML = '<option value="">Select a Territory</option>';
-    group?.territories.sort().forEach(territory => {
-      const option = document.createElement('option');
-      option.value = territory;
-      option.textContent = territory;
-      territoryDropdown.appendChild(option);
-    });
+    if (group) {
+      group.territories.forEach(territory => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = territory.name;
+        checkbox.id = `checkbox-${territory.name}`;
 
-    territoryDropdown.disabled = false; // Enable dropdown
+        const label = document.createElement('label');
+        label.htmlFor = `checkbox-${territory.name}`;
+        label.textContent = territory.name;
+
+        territoryContainer.appendChild(checkbox);
+        territoryContainer.appendChild(label);
+        territoryContainer.appendChild(document.createElement('br'));
+      });
+    }
   });
 }
 
-// Generate a random point
+// Generate a random point with proportional weighting
 function generateRandomSpot() {
   const parentCountry = document.getElementById('countryDropdown').value;
-  const territory = document.getElementById('territoryDropdown').value;
+  const selectedTerritories = Array.from(
+    document.querySelectorAll('#territoryContainer input:checked')
+  ).map(checkbox => checkbox.value);
 
-  const selectedRegion = territory || parentCountry; // Use territory if selected, fallback to parent country
-  if (selectedRegion === "world") {
-    alert('Generating a random spot for the entire world!');
-    // Generate a random spot for the world
+  const selectedFeatures = countries.filter(feature =>
+    selectedTerritories.includes(feature.properties.name) ||
+    feature.properties.name === parentCountry
+  );
+
+  if (selectedFeatures.length === 0) {
+    alert('No valid regions selected.');
     return;
   }
 
-  const selectedFeature = countries.find(feature => feature.properties.name === selectedRegion);
+  // Proportional random selection
+  const totalArea = selectedFeatures.reduce((sum, feature) => sum + turf.area(feature), 0);
+  let randomValue = Math.random() * totalArea;
 
-  if (!selectedFeature) {
-    alert('Region not found in GeoJSON.');
-    return;
-  }
+  for (const feature of selectedFeatures) {
+    const featureArea = turf.area(feature);
+    if (randomValue <= featureArea) {
+      // Generate random point within selected feature
+      const bbox = turf.bbox(feature);
+      let randomPoint;
 
-  // Generate random point within the region
-  const bbox = turf.bbox(selectedFeature);
-  let randomPoint;
+      do {
+        randomPoint = turf.randomPoint(1, { bbox }).features[0];
+      } while (!turf.booleanPointInPolygon(randomPoint, feature));
 
-  do {
-    randomPoint = turf.randomPoint(1, { bbox }).features[0];
-  } while (!turf.booleanPointInPolygon(randomPoint, selectedFeature));
+      // Highlight the selected feature and add the random point
+      map.eachLayer(layer => {
+        if (!(layer instanceof L.TileLayer)) {
+          map.removeLayer(layer);
+        }
+      });
 
-  // Clear existing markers and highlight the region
-  map.eachLayer(layer => {
-    if (!(layer instanceof L.TileLayer)) {
-      map.removeLayer(layer);
+      L.geoJSON(feature, { style: { color: 'blue', weight: 2 } }).addTo(map);
+
+      const coords = randomPoint.geometry.coordinates;
+      L.marker([coords[1], coords[0]])
+        .addTo(map)
+        .bindPopup(`Random Spot in ${feature.properties.name} at (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`)
+        .openPopup();
+
+      map.fitBounds(L.geoJSON(feature).getBounds());
+      return;
     }
-  });
 
-  L.geoJSON(selectedFeature, { style: { color: 'blue', weight: 2 } }).addTo(map);
-
-  // Add marker for the random point
-  const coords = randomPoint.geometry.coordinates;
-  L.marker([coords[1], coords[0]]).addTo(map)
-    .bindPopup(`Random Spot in ${selectedRegion} at (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`)
-    .openPopup();
-
-  map.fitBounds(L.geoJSON(selectedFeature).getBounds());
+    randomValue -= featureArea;
+  }
 }
 
 // Attach the random spot generator to the button

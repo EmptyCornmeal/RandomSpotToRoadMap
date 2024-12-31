@@ -37,11 +37,10 @@ main {
 
 .controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 20px;
   margin-bottom: 20px;
-  justify-content: center;
-  align-items: center;
+  align-items: flex-start;
 }
 
 select, button {
@@ -67,6 +66,16 @@ button:hover {
 button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+#territoryContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#territoryContainer input[type="checkbox"] {
+  margin-right: 5px;
 }
 
 #map {
