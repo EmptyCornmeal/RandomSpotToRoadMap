@@ -8,13 +8,14 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let countries; // Store GeoJSON features globally
 
 // Fetch and load GeoJSON
-fetch('data/world-administrative-boundaries.geojson')
+fetch('world-administrative-boundaries.geojson')
   .then(response => response.json())
   .then(data => {
     countries = data.features;
     populateCountryDropdowns(); // Populate dropdowns after data is loaded
   })
   .catch(err => console.error('Error loading GeoJSON:', err));
+
 
 // Group countries and territories
 function groupCountriesAndTerritories() {
