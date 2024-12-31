@@ -89,6 +89,14 @@ function populateCountryDropdowns() {
   // Update territories when parent country is selected
   parentDropdown.addEventListener('change', () => {
     const selectedParent = parentDropdown.value;
+
+    if (selectedParent === 'world') {
+      // Clear and disable territory dropdown for "All Countries"
+      territoryDropdown.innerHTML = '<option value="">Select a Territory</option>';
+      territoryDropdown.disabled = true;
+      return;
+    }
+
     const group = Object.values(groupedData).find(g => g.parentName === selectedParent);
 
     // Clear and populate territory dropdown
@@ -99,6 +107,8 @@ function populateCountryDropdowns() {
       option.textContent = territory;
       territoryDropdown.appendChild(option);
     });
+
+    territoryDropdown.disabled = false; // Enable dropdown
   });
 }
 
