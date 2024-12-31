@@ -5,112 +5,113 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 
-let countries; // Store GeoJSON features
-let randomPoint; // Store the random point
+let countries; // Store GeoJSON features globally
 
-// Load GeoJSON and populate dropdown
-fetch('https://raw.githubusercontent.com/EmptyCornmeal/RandomSpotToRoadMap/main/world-administrative-boundaries.geojson')
+// Fetch and load GeoJSON
+fetch('data/world-administrative-boundaries.geojson')
   .then(response => response.json())
   .then(data => {
-    countries = data.features; // Save countries globally
-    L.geoJSON(data).addTo(map); // Add all countries to the map
-    populateCountryDropdown(); // Populate dropdown with country names
-  });
+    countries = data.features;
+    populateCountryDropdowns(); // Populate the dropdowns after data is loaded
+  })
+  .catch(err => console.error('Error loading GeoJSON:', err));
 
-// Populate the dropdown menu with country names
-function populateCountryDropdown() {
-  const dropdown = document.getElementById('countryDropdown');
+// Group countries and territories
+function groupCountriesAndTerritories() {
+  const groupedData = {};
+
   countries.forEach(country => {
-    const option = document.createElement('option');
-    option.value = country.properties.name; // Adjust to match the property for the country name
-    option.textContent = country.properties.name;
-    dropdown.appendChild(option);
+    const parentCode = country.properties.color_code || country.properties.iso3; // Parent country code
+    const name = country.properties.name; // Country or territory name
+    const status = country.properties.status || ''; // Status (e.g., "Member State", "Territory")
+
+    if (!groupedData[parentCode]) {
+      groupedData[parentCode] = {
+        parentName: status === 'Member State' ? name : parentCode, // Use name if it's a member state
+        territories: []
+      };
+    }
+
+    if (status.includes('Territory')) {
+      groupedData[parentCode].territories.push(name); // Add as a territory
+    } else {
+      groupedData[parentCode].parentName = name; // Update parent country name
+    }
+  });
+
+  return groupedData;
+}
+
+// Populate dropdowns
+function populateCountryDropdowns() {
+  const groupedData = groupCountriesAndTerritories();
+
+  const parentDropdown = document.getElementById('countryDropdown');
+  const territoryDropdown = document.getElementById('territoryDropdown');
+
+  // Populate parent country dropdown
+  Object.values(groupedData)
+    .sort((a, b) => a.parentName.localeCompare(b.parentName))
+    .forEach(group => {
+      const option = document.createElement('option');
+      option.value = group.parentName;
+      option.textContent = group.parentName;
+      parentDropdown.appendChild(option);
+    });
+
+  // Update territories when parent country is selected
+  parentDropdown.addEventListener('change', () => {
+    const selectedParent = parentDropdown.value;
+    const group = Object.values(groupedData).find(g => g.parentName === selectedParent);
+
+    // Clear and populate territory dropdown
+    territoryDropdown.innerHTML = '<option value="">Select a Territory</option>';
+    group?.territories.sort().forEach(territory => {
+      const option = document.createElement('option');
+      option.value = territory;
+      option.textContent = territory;
+      territoryDropdown.appendChild(option);
+    });
   });
 }
 
-// Calculate bounding box for a feature
-function calculateBBox(feature) {
-  const coordinates = feature.geometry.coordinates.flat(Infinity); // Handle deeply nested arrays
-  const lngs = coordinates.filter((_, i) => i % 2 === 0); // Extract longitudes
-  const lats = coordinates.filter((_, i) => i % 2 !== 0); // Extract latitudes
-  return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
-}
-
-// Generate a random point within a country's bounding box
-function getRandomPointInCountry(country) {
-  const bbox = calculateBBox(country); // Get the bounding box
-  const [minLng, minLat, maxLng, maxLat] = bbox;
-
-  while (true) {
-    const randomLng = Math.random() * (maxLng - minLng) + minLng;
-    const randomLat = Math.random() * (maxLat - minLat) + minLat;
-
-    try {
-      const point = turf.point([randomLng, randomLat]);
-
-      // Handle both Polygon and MultiPolygon geometries
-      const isValidPoint =
-        country.geometry.type === 'Polygon'
-          ? turf.booleanPointInPolygon(point, country)
-          : country.geometry.type === 'MultiPolygon'
-          ? country.geometry.coordinates.some(polygon =>
-              turf.booleanPointInPolygon(point, { type: 'Polygon', coordinates: polygon })
-            )
-          : false;
-
-      if (isValidPoint) {
-        return [randomLat, randomLng]; // Leaflet uses [lat, lng]
-      }
-    } catch (error) {
-      console.error('Error validating point:', error);
-      throw error;
-    }
-  }
-}
-
-// Main function to generate a random spot
+// Generate a random point
 function generateRandomSpot() {
-  const dropdown = document.getElementById('countryDropdown');
-  const selectedCountryName = dropdown.value;
+  const parentCountry = document.getElementById('countryDropdown').value;
+  const territory = document.getElementById('territoryDropdown').value;
 
-  if (!selectedCountryName) {
-    alert('Please select a country!');
+  const selectedRegion = territory || parentCountry; // Use territory if selected, fallback to parent country
+  const selectedFeature = countries.find(feature => feature.properties.name === selectedRegion);
+
+  if (!selectedFeature) {
+    alert('Region not found in GeoJSON.');
     return;
   }
 
-  // Find the selected country by name
-  const selectedCountry = countries.find(
-    country => country.properties.name === selectedCountryName
-  );
+  // Generate random point within the region
+  const bbox = turf.bbox(selectedFeature);
+  let randomPoint;
 
-  if (!selectedCountry) {
-    alert('Country not found in GeoJSON data.');
-    return;
-  }
+  do {
+    randomPoint = turf.randomPoint(1, { bbox }).features[0];
+  } while (!turf.booleanPointInPolygon(randomPoint, selectedFeature));
 
-  randomPoint = getRandomPointInCountry(selectedCountry); // Generate a random point
-
-  // Clear existing non-GeoJSON layers (like markers, circles, and polylines)
+  // Clear existing markers and highlight the region
   map.eachLayer(layer => {
-    if (!(layer instanceof L.TileLayer) && !(layer instanceof L.GeoJSON)) {
+    if (!(layer instanceof L.TileLayer)) {
       map.removeLayer(layer);
     }
   });
 
-  // Highlight the selected country
-  const countryLayer = L.geoJSON(selectedCountry, { style: { color: 'blue', weight: 2 } });
-  countryLayer.addTo(map);
+  L.geoJSON(selectedFeature, { style: { color: 'blue', weight: 2 } }).addTo(map);
 
-  // Zoom to the country bounds
-  map.fitBounds(countryLayer.getBounds());
-
-  // Add a marker for the random point with coordinates in the popup
-  const [lat, lng] = randomPoint;
-  L.marker(randomPoint)
-    .addTo(map)
-    .bindPopup(`Random Spot in ${selectedCountryName} at (${lat.toFixed(5)}, ${lng.toFixed(5)})`)
+  // Add marker for the random point
+  const coords = randomPoint.geometry.coordinates;
+  L.marker([coords[1], coords[0]]).addTo(map)
+    .bindPopup(`Random Spot in ${selectedRegion} at (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`)
     .openPopup();
+
+  map.fitBounds(L.geoJSON(selectedFeature).getBounds());
 }
 
-// Event Listener
 document.getElementById('generate').addEventListener('click', generateRandomSpot);

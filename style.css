@@ -37,39 +37,34 @@ main {
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
   justify-content: center;
   align-items: center;
-  margin-bottom: 10px;
 }
 
-.controls select {
+select, button {
   padding: 10px;
   font-size: 16px;
-  margin-right: 10px;
   border: 1px solid #ccc;
   border-radius: 5px;
   outline: none;
-  appearance: none;
 }
 
-.controls button {
-  padding: 10px 20px;
-  font-size: 16px;
-  font-weight: bold;
-  color: white;
+button {
   background-color: #007bff;
-  border: none;
-  border-radius: 5px;
+  color: white;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-.controls button:hover {
+button:hover {
   background-color: #0056b3;
   transform: scale(1.05);
 }
 
-.controls button:disabled {
+button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }

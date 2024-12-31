@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Random Spot in Selected Country</title>
+  <title>Random Spot by Country</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
@@ -11,14 +11,21 @@
 </head>
 <body>
   <header>
-    <h1>Random Spot in Selected Country</h1>
+    <h1>Random Spot Generator</h1>
     <p>Select a country and generate a random location within its boundaries.</p>
   </header>
   <main>
     <div class="controls">
+      <label for="countryDropdown">Country:</label>
       <select id="countryDropdown">
         <option value="">Select a Country</option>
       </select>
+
+      <label for="territoryDropdown">Territory:</label>
+      <select id="territoryDropdown">
+        <option value="">Select a Territory</option>
+      </select>
+
       <button id="generate">Generate Random Spot</button>
     </div>
     <div id="map"></div>
