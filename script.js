@@ -19,10 +19,11 @@ fetch('world-administrative-boundaries.geojson')
     console.log('GeoJSON Data:', data); // Debug GeoJSON data
     countries = data.features;
     populateCountryDropdowns(); // Populate dropdowns after data is loaded
+    renderAllBoundaries(); // Show boundaries on the map
   })
   .catch(err => console.error('Error loading GeoJSON:', err));
 
-// Group countries and territories with areas
+// Group countries and territories
 function groupCountriesAndTerritories() {
   const groupedData = { independentTerritories: [] };
 
@@ -61,12 +62,25 @@ function groupCountriesAndTerritories() {
   return groupedData;
 }
 
+// Render all boundaries on the map
+function renderAllBoundaries() {
+  L.geoJSON(countries, {
+    style: { color: 'gray', weight: 1 },
+  }).addTo(map);
+}
+
 // Populate country and territory dropdowns
 function populateCountryDropdowns() {
   const groupedData = groupCountriesAndTerritories();
 
   const parentDropdown = document.getElementById('countryDropdown');
   const territoryContainer = document.getElementById('territoryContainer'); // Checkbox container
+
+  // Check if DOM elements exist
+  if (!parentDropdown || !territoryContainer) {
+    console.error('Dropdown or territory container not found.');
+    return;
+  }
 
   // Populate parent country dropdown
   Object.values(groupedData)
